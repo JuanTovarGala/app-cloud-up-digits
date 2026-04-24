@@ -76,7 +76,7 @@ def load_history(sb: Client) -> pd.DataFrame:
 
 # ── UI ─────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Digit Classifier", page_icon="🔢", layout="centered")
-st.title("🔢 Clasificador de Dígitos")
+st.title("🔢 Clasificador de Dígitos - UP")
 st.caption("Sube una imagen de un número escrito a mano (0–9)")
 
 sb  = get_supabase()
