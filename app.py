@@ -113,4 +113,21 @@ if uploaded:
     with st.expander("Detalles"):
         st.json({
             "digit":      pred,
-            "confiden
+            "confidence": confidence,
+            "blob_url":   blob_url,
+            "filename":   filename,
+        })
+
+    # ── Historial ─────────────────────────────────────────────────
+    st.divider()
+    st.subheader("📋 Historial de predicciones")
+
+    try:
+        df = load_history(sb)
+        if df.empty:
+            st.info("Aún no hay predicciones registradas.")
+        else:
+            st.write(df.to_html(escape=False, index=False), unsafe_allow_html=True)
+            st.caption(f"{len(df)} predicciones · últimas 50")
+    except Exception as e:
+        st.error(f"Error cargando historial: {e}")
