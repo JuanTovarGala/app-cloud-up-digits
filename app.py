@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 from PIL import Image, ImageOps
 import joblib, uuid
+import pandas as pd
 from supabase import create_client, Client
 
 BUCKET_NAME = "uploads"
@@ -46,20 +47,51 @@ def save_table(sb: Client, filename: str, digit: int,
     }).execute()
 
 
+def load_history(sb: Client) -> pd.DataFrame:
+    response = (
+        sb.table(TABLE_NAME)
+        .select("created_at, digit, confidence, filename, blob_url")
+        .order("created_at", desc=True)
+        .limit(50)
+        .execute()
+    )
+    if not response.data:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(response.data)
+    df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
+    df["confidence"] = (df["confidence"] * 100).round(2).astype(str) + "%"
+    df["imagen"] = df["blob_url"].apply(
+        lambda url: f'<a href="{url}" target="_blank">🔗 ver</a>'
+    )
+    df = df.drop(columns=["blob_url", "filename"])
+    df = df.rename(columns={
+        "created_at": "Fecha",
+        "digit":      "Dígito",
+        "confidence": "Confianza",
+        "imagen":     "Imagen",
+    })
+    return df
+
+
+# ── UI ─────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Digit Classifier", page_icon="🔢", layout="centered")
 st.title("🔢 Clasificador de Dígitos")
 st.caption("Sube una imagen de un número escrito a mano (0–9)")
+
+sb  = get_supabase()
+clf = load_model()
 
 uploaded = st.file_uploader("Imagen PNG o JPG", type=["png", "jpg", "jpeg"])
 
 if uploaded:
     img = Image.open(uploaded)
+
     col1, col2 = st.columns(2)
 
     with col1:
         st.image(img, caption="Imagen subida", use_container_width=True)
 
-    clf        = load_model()
     arr        = preprocess(img)
     pred       = int(clf.predict(arr)[0])
     proba      = clf.predict_proba(arr)[0]
@@ -70,18 +102,15 @@ if uploaded:
         st.metric("Confianza", f"{confidence:.1%}")
         st.bar_chart({str(i): proba[i] for i in range(10)})
 
-    sb       = get_supabase()
     filename = f"{uuid.uuid4()}_{uploaded.name}"
 
     with st.spinner("Guardando en Supabase..."):
         blob_url = save_blob(sb, uploaded.getvalue(), filename)
         save_table(sb, filename, pred, confidence, blob_url)
 
-    st.success("✅ Imagen en Storage · Predicción en tabla")
+    st.success("✅ Imagen guardada en Storage · Predicción registrada en tabla")
+
     with st.expander("Detalles"):
         st.json({
             "digit":      pred,
-            "confidence": confidence,
-            "blob_url":   blob_url,
-            "filename":   filename,
-        })
+            "confiden
